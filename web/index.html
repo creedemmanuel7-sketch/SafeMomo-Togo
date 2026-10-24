@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="SafeMomo regarde la photo d'un reçu T-Money ou Flooz et te dit en une phrase si c'est un piège.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="SafeMomo">
+  <title>SafeMomo</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preload" href="fonts/atkinson-700.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <svg width="30" height="30" viewBox="0 0 24 24" aria-hidden="true" class="ico"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>SafeMomo</span>
+      </div>
+      <button class="icon-btn" id="open-team" type="button" aria-label="Menu Équipe">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" class="ico"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+      </button>
+    </header>
+
+    <!-- 1. Écran vide -->
+    <main class="screen" id="screen-empty">
+      <h1 class="h1">Montre la photo du reçu ou du message.</h1>
+      <p class="lead">Je te dis en dix secondes si c'est un piège.</p>
+
+      <label class="btn btn-camera" for="input-camera">
+        <svg width="60" height="60" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-light"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        <span>Prendre la photo</span>
+      </label>
+      <input class="visually-hidden" id="input-camera" type="file" accept="image/*" capture="environment">
+
+      <label class="btn btn-outline" for="input-gallery">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" class="ico"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>
+        Choisir dans la galerie
+      </label>
+      <input class="visually-hidden" id="input-gallery" type="file" accept="image/*">
+
+      <button class="btn btn-soft" id="btn-sample" type="button">Voir l'exemple</button>
+
+      <div class="hints">
+        <p><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-muted"><path d="M4 9l1-5h14l1 5M4 9v11h16V9M4 9h16M10 20v-6h4v6"/></svg>
+          <span><b>Boutique</b> : le client te montre « j'ai envoyé ».</span></p>
+        <p><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-muted"><path d="M3 11l9-7 9 7M5 10v10h14V10"/></svg>
+          <span><b>Famille</b> : on te demande de renvoyer l'argent.</span></p>
+      </div>
+    </main>
+
+    <!-- 2. Photo prête -->
+    <main class="screen" id="screen-ready" hidden>
+      <h1 class="h2">Voici la photo.</h1>
+      <p class="lead">Vérifie qu'on voit bien le message, puis appuie.</p>
+      <div class="photo"><img id="preview-ready" alt="Photo choisie"></div>
+      <div class="bottom">
+        <button class="btn btn-primary" id="btn-scan" type="button">
+          Dis-moi quoi faire
+          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-light ico-bold"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <button class="btn btn-outline" type="button" data-action="reset">Changer de photo</button>
+      </div>
+    </main>
+
+    <!-- 3. Attente -->
+    <main class="screen" id="screen-waiting" hidden>
+      <div class="photo photo-scan"><img id="preview-waiting" alt="Photo en cours d'analyse"><span class="scanline" aria-hidden="true"></span></div>
+      <div class="waiting" role="status">
+        <p class="waiting-title">Je regarde la photo...</p>
+        <div class="progress" aria-hidden="true"><span></span></div>
+        <p class="lead">Environ dix secondes. Ne donne rien pour l'instant.</p>
+      </div>
+      <div class="bottom">
+        <button class="btn btn-outline" id="btn-cancel" type="button">Annuler</button>
+      </div>
+    </main>
+
+    <!-- 4–6. Verdict : danger, à vérifier, démo -->
+    <main class="screen" id="screen-verdict" hidden>
+      <p class="demo-line" id="demo-line" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-muted"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+        Démo sans réseau · phrase préparée à l'avance
+      </p>
+
+      <section class="card" id="card" aria-live="assertive">
+        <div class="card-head">
+          <span class="pill" id="pill">
+            <svg id="pill-danger" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-bold"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>
+            <svg id="pill-check" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-bold"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span id="pill-text">DANGER</span>
+          </span>
+          <span class="scene" id="scene"></span>
+        </div>
+        <p class="sentence" id="sentence" tabindex="-1"></p>
+      </section>
+
+      <button class="btn btn-primary btn-listen" id="btn-listen" type="button" aria-pressed="false">
+        <svg class="ico ico-light listen-idle" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 010 7M19 6a8.5 8.5 0 010 12"/></svg>
+        <svg class="ico ico-bold listen-busy" width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 10v4M9 7v10M13 4v16M17 8v8M21 11v2"/></svg>
+        <span id="listen-text">Écouter</span>
+      </button>
+
+      <a class="btn btn-outline" id="btn-whatsapp" href="#" target="_blank" rel="noopener">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" class="ico"><path d="M4 20l1.5-4A8 8 0 1112 20a8 8 0 01-3.6-.9z"/></svg>
+        Prévenir la famille
+      </a>
+
+      <details class="why" id="why">
+        <summary>
+          Voir pourquoi
+          <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-bold chevron"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="why-body">
+          <h2 id="why-title"></h2>
+          <div class="why-block">
+            <span class="why-label">EXPÉDITEUR</span>
+            <span id="why-sender"></span>
+          </div>
+          <div class="why-block" id="why-flags-block">
+            <span class="why-label">SIGNAUX</span>
+            <ul id="why-flags"></ul>
+          </div>
+          <div class="why-advice"><b>Conseil :</b> <span id="why-advice"></span></div>
+          <span class="why-score" id="why-score"></span>
+        </div>
+      </details>
+
+      <button class="btn btn-link" type="button" data-action="reset">Nouvelle photo</button>
+    </main>
+
+    <!-- 7. Erreur -->
+    <main class="screen" id="screen-error" hidden>
+      <div class="photo photo-small"><img id="preview-error" alt="Photo choisie"></div>
+      <section class="error-card" role="alert">
+        <svg width="36" height="36" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-bold"><path d="M2 8.5a15 15 0 0120 0M5 12a10 10 0 0114 0M8.5 15.5a5 5 0 017 0M12 19h.01M3 3l18 18"/></svg>
+        <p class="error-title" id="error-title"></p>
+        <p class="lead" id="error-text"></p>
+      </section>
+      <div class="bottom">
+        <button class="btn btn-primary" id="btn-error-action" type="button">
+          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-light ico-bold"><path d="M20 12a8 8 0 11-2.3-5.7M20 4v5h-5"/></svg>
+          <span id="error-action-text">Réessayer</span>
+        </button>
+        <button class="btn btn-outline" type="button" data-action="reset">Changer de photo</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- Menu Équipe : jamais ouvert tout seul -->
+  <dialog class="sheet" id="team" aria-labelledby="team-title">
+    <form method="dialog" class="sheet-body">
+      <div class="grabber" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <h2 id="team-title">Équipe</h2>
+        <button class="icon-btn" value="close" aria-label="Fermer">
+          <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" class="ico ico-bold"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <p class="sheet-note">Réglages pour l'équipe, pas pour la vendeuse.</p>
+
+      <div class="field">
+        <label for="team-key">Clé API Google</label>
+        <input id="team-key" type="password" autocomplete="off" spellcheck="false" placeholder="Laisser vide si le serveur l'a déjà">
+        <span class="field-note" id="team-key-note">Gardée seulement sur ce téléphone.</span>
+      </div>
+
+      <div class="field">
+        <label for="team-model">Modèle</label>
+        <select id="team-model"><option value="gemma-4-26b-a4b-it">Gemma 4 26B A4B (rapide)</option></select>
+      </div>
+
+      <label class="toggle">
+        Mode démo sans internet
+        <input id="team-demo" type="checkbox">
+      </label>
+
+      <p class="status" id="team-status"><span class="dot" aria-hidden="true"></span><span id="team-status-text">Je vérifie le serveur...</span></p>
+      <p class="field-note" id="team-last-error" hidden></p>
+
+      <button class="btn btn-primary" value="close">Fermer</button>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
