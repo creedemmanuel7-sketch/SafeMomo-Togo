@@ -11,21 +11,32 @@ Construit avec **Gemma 4** pour le Hacktoberfest Hack Day Lomé × Python Togo.
 
 **English, in one paragraph.** In Lomé, people hand over goods or send money back because a picture looks like a T-Money or Flooz receipt. SafeMomo sends that picture to Gemma 4 and answers with one spoken French sentence. The risk score stays behind a "why" panel. The project is MIT-licensed, published as an agent skill, and ships an offline demo when the network fails.
 
+## Pour le jury
+
+Quatre faits, lisibles sans ouvrir le code.
+
+1. **Le geste.** Une photo, une phrase en français, dite à voix haute. La vendeuse n'a pas de score à interpréter. `*145#` reste la vérification du solde.
+2. **Gemma 4, vraiment.** `gemma-4-26b-a4b-it` lit l'image. `gemma-4-31b-it` est le second choix. **Voir l'exemple** appelle le modèle, pas une phrase en cache. **Écouter** demande la voix Charon à Gemini.
+3. **Open source, pas une archive.** Licence [MIT](./LICENSE), dépôt public, [SKILL.md](./SKILL.md) réutilisable, tests sans appel réseau, photo d'exemple synthétique, clé absente de git. Contribuer, signaler, relancer : [CONTRIBUTING.md](./CONTRIBUTING.md), [SECURITY.md](./SECURITY.md), [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+4. **La démo tient si le wifi lâche.** Le mode démo le dit à l'écran. Il ne s'applique qu'au bouton **Dis-moi quoi faire**.
+
 ## Sommaire
 
-1. [Le problème](#le-problème)
-2. [Ce que fait SafeMomo](#ce-que-fait-safemomo)
-3. [Démo en direct](#démo-en-direct)
-4. [Installation](#installation)
-5. [Architecture](#architecture)
-6. [Contrat du verdict](#contrat-du-verdict)
-7. [Arborescence](#arborescence)
-8. [Tests](#tests)
-9. [Équipe](#équipe)
-10. [Prix visés](#prix-visés)
-11. [Ressources](#ressources)
-12. [Attribution IA](#attribution-ia)
-13. [Licence](#licence)
+1. [Pour le jury](#pour-le-jury)
+2. [Le problème](#le-problème)
+3. [Ce que fait SafeMomo](#ce-que-fait-safemomo)
+4. [Démo en direct](#démo-en-direct)
+5. [Installation](#installation)
+6. [Architecture](#architecture)
+7. [Contrat du verdict](#contrat-du-verdict)
+8. [Arborescence](#arborescence)
+9. [Tests](#tests)
+10. [Équipe](#équipe)
+11. [Prix visés](#prix-visés)
+12. [Projet open source](#projet-open-source)
+13. [Ressources](#ressources)
+14. [Attribution IA](#attribution-ia)
+15. [Licence](#licence)
 
 ## Le problème
 
@@ -64,14 +75,13 @@ python server.py
 
 Puis ouvrir `http://localhost:8000`. Le terminal affiche aussi l'adresse à taper sur le téléphone, s'il est sur le même Wi-Fi. Dans le navigateur du téléphone : menu, puis « Ajouter à l'écran d'accueil ».
 
-1. Menu Équipe, en haut à droite. Cocher **Mode démo sans internet** si la clé ou le wifi n'est pas sûr. Refermer le menu. La clé ne doit pas être visible.
-2. **Voir l'exemple.** La photo `samples/fake_tmoney_sample.png` s'affiche.
-3. **Dis-moi quoi faire.**
-4. Laisser la carte rouge, puis appuyer sur **Écouter**.
-5. Phrase attendue en mode démo : « Ne renvoie rien. Ce message n'est pas un vrai T-Money. Tape *145#.* »
-6. S'il reste quelques secondes, ouvrir **Voir pourquoi**, montrer un signal, s'arrêter.
+Avec une clé dans `.env` et du réseau, `server.py` la charge tout seul. La clé ne s'affiche pas.
 
-Avec une clé dans `.env` et du réseau, `server.py` la charge tout seul. Refaire les mêmes clics sans cocher le mode démo. Si l'appel traîne, recocher le mode démo et rejouer l'exemple.
+1. **Voir l'exemple.** La photo `samples/fake_tmoney_sample.png` part vers Gemma 4. Ce bouton ignore le mode démo.
+2. Laisser la carte, puis appuyer sur **Écouter**. La voix vient de Gemini, voix Charon.
+3. S'il reste quelques secondes, ouvrir **Voir pourquoi**, montrer un signal, s'arrêter.
+
+Si la clé ou le wifi n'est pas sûr : menu Équipe, cocher **Mode démo sans internet**, refermer, puis **Dis-moi quoi faire**. Phrase préparée : « Ne renvoie rien. Ce message n'est pas un vrai T-Money. Tape *145#. » L'écran dit que c'est une démo.
 
 Le créneau des finalistes dure 120 secondes et se fait sans démo. Cette séquence sert à la vidéo de présélection et à un écran montré avant le pitch.
 
@@ -121,7 +131,8 @@ Routes :
 |---|---|
 | `POST /api/analyze` | Corps = image brute. En-têtes optionnels `X-Api-Key` et `X-Model`. Réponse : `{"verdict": {...}}` |
 | `GET /api/demo` | Verdict préparé, sans réseau |
-| `GET /api/config` | Modèles Gemma 4, et `server_key` vrai ou faux |
+| `GET /api/config` | Modèles Gemma 4, et `server_key` vrai ou faux. Jamais la clé |
+| `POST /api/speak` | Corps `{"text": "..."}`. Réponse audio WAV, voix Charon |
 
 Une erreur revient sous `{"error": {"kind", "detail"}}`. L'écran la traduit en une phrase française avec une action.
 
@@ -204,6 +215,9 @@ SafeMomo-Togo/
 ├── UX.md
 ├── HANDOVER_CURSOR.md
 ├── LICENSE
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CODE_OF_CONDUCT.md
 ├── requirements.txt
 ├── .gitignore
 ├── app.py
@@ -253,6 +267,21 @@ Une seule soumission peut entrer dans les deux catégories.
 
 Événement : [Hacktoberfest Hack Day Lomé × Python Togo](https://www.mlh.com/events/hacktoberfest-hack-day-lome-x-python-togo) · fiche [OrganizerHQ / MLH](https://events.mlh.com/events/15369-hacktoberfest-hack-day-lome-x-python-togo).
 
+## Projet open source
+
+Ce dépôt est fait pour être repris, pas seulement noté.
+
+| Pièce | Où |
+|---|---|
+| Droit d'usage, de modification, de redistribution | [LICENSE](./LICENSE), MIT |
+| Lancer, tester, ouvrir une pull request | [CONTRIBUTING.md](./CONTRIBUTING.md) |
+| Ne pas publier une clé ni un SMS réel | [SECURITY.md](./SECURITY.md) |
+| Règles entre personnes | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md), celui de MLH |
+| Même raisonnement, hors de cette application | [SKILL.md](./SKILL.md) |
+| Ce que l'écran a le droit de montrer | [UX.md](./UX.md) |
+
+Fork, branche, pull request vers `master`. Les textes visibles restent en français. Les noms de fichiers restent en anglais. Une contribution ne commit pas `.env`, ni une capture de SMS réel.
+
 ## Ressources
 
 ### Celles données pour la journée
@@ -283,10 +312,27 @@ Liens publiés sur la page de l'événement.
 - [Code de conduite MLH](https://static.mlh.io/docs/mlh-code-of-conduct.pdf)
 - [Licence MIT](https://opensource.org/licenses/MIT) — texte complet dans [LICENSE](./LICENSE)
 
+### Ce qu'il faut pour un projet open source
+
+Guides suivis pour que le dépôt se lise et se reprenne sans nous écrire.
+
+- [Open Source Guides](https://opensource.guide/) — démarrer, accueillir une contribution, maintenir.
+- [Starting a project](https://opensource.guide/starting-a-project/) — licence, README, public dès le premier jour.
+- [How to contribute](https://opensource.guide/how-to-contribute/) — fork, branche, pull request, relecture.
+- [Fichiers de santé d'un dépôt GitHub](https://docs.github.com/communities/setting-up-your-project-for-healthy-contributions) — `README`, `LICENSE`, `CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`.
+- [Politique de sécurité](https://docs.github.com/code-security/getting-started/adding-a-security-policy-to-your-repository) — le rôle de `SECURITY.md`.
+- [Licence MIT](https://choosealicense.com/licenses/mit/) — texte choisi, identifiant SPDX `MIT`. Référence [SPDX](https://spdx.org/licenses/MIT.html) et [OSI](https://opensource.org/licenses/MIT).
+- [Agent Skills, spécification](https://agentskills.io/specification) — format de [SKILL.md](./SKILL.md).
+- [Code de conduite MLH](https://static.mlh.io/docs/mlh-code-of-conduct.pdf) — règles de la journée, reprises dans [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+
 ### Dans ce dépôt
 
 - [SKILL.md](./SKILL.md) — skill agent, même contrat que l'application
 - [UX.md](./UX.md) — états, textes, couleurs, ce que l'écran a le droit de montrer
+- [CONTRIBUTING.md](./CONTRIBUTING.md) — lancer, tester, proposer un changement
+- [SECURITY.md](./SECURITY.md) — clé, SMS réels, signalement
+- [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) — conduite
+- [LICENSE](./LICENSE) — MIT
 - [HANDOVER_CURSOR.md](./HANDOVER_CURSOR.md) — contexte du sprint et commande de lancement
 - [samples/generate_sample.py](./samples/generate_sample.py) — image synthétique de la démo
 
