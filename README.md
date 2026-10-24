@@ -53,9 +53,9 @@ streamlit run app.py
 ## 👥 The Team
 Proudly built by **Team SafeMomo** for Hacktoberfest Hack Day Lomé 2026:
 - **ADJIGNON K. Crédo** — *Team Lead, Core AI Architect & Repo Maintainer*
-- **AKOMAGBE E. Stéphane** — *Lead Frontend & UX Engineer (Streamlit & Localisation)*
-- **HAMADOU Nassif** — *Lead QA, Datasets & Demo Specialist*
-- **HEMAZRO Eloge** — *Lead Product & Final Pitcher*
+- **HEMAZRO Eloge** — *Lead Frontend & UX Engineer (Streamlit & Localisation)*
+- **AKOMAGBE E. Stéphane** — *Lead QA, Datasets & Demo Specialist*
+- **HAMADOU Nassif** — *Lead Product & Final Pitcher*
 
 ## 🏆 Target Hackathon Challenges
 - **Best Use of Gemma 4** (Multimodal image + text reasoning for community protection)
