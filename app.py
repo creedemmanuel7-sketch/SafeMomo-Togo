@@ -57,8 +57,23 @@ def main() -> None:
 
 
 def _remember_api_key() -> None:
+    _load_env()
     env_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or ""
     st.session_state.api_key_env = env_key
+
+
+def _load_env(path: Path = Path(".env")) -> None:
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and value:
+            os.environ[key] = value
 
 
 def _remember_source(uploaded: object, use_sample: bool) -> None:

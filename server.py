@@ -5,18 +5,21 @@ analyze_screenshot() ou demo_verdict(), on renvoie le verdict en JSON.
 
 Lancer :  python server.py            (port 8000, toutes les interfaces)
           PORT=9000 python server.py
-Clé API : variable GEMINI_API_KEY ou GOOGLE_API_KEY, sinon envoyée par
-          le menu Équipe de l'app (en-tête X-Api-Key).
+Clé API : fichier .env, ou variable GEMINI_API_KEY / GOOGLE_API_KEY.
+          Sinon, le menu Équipe de l'app peut l'envoyer (en-tête X-Api-Key).
 """
 
 from __future__ import annotations
 
+import base64
 import io
 import json
 import mimetypes
 import os
 import socket
 import sys
+import urllib.error
+import urllib.request
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -36,6 +39,13 @@ ROOT = Path(__file__).resolve().parent
 WEB_DIR = ROOT / "web"
 SAMPLE_PATH = ROOT / "samples" / "fake_tmoney_sample.png"
 MAX_UPLOAD = 15 * 1024 * 1024  # 15 Mo : une photo de téléphone tient largement.
+TTS_MODEL = "gemini-3.8-flash-tts"
+TTS_VOICE = "Charon"
+TTS_STYLE = (
+    "Voix grave, sonore et posée, comme une annonce claire dans un marché. "
+    "Articule fort chaque mot. Débit lent. Français."
+)
+_SPEECH_CACHE: dict[str, bytes] = {}
 
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 mimetypes.add_type("text/javascript", ".js")
@@ -43,8 +53,96 @@ mimetypes.add_type("font/woff2", ".woff2")
 mimetypes.add_type("image/svg+xml", ".svg")
 
 
+def _load_env(path: Path = ROOT / ".env") -> None:
+    if not path.is_file():
+        return
+    for raw in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and value:
+            os.environ[key] = value
+
+
 def _server_key() -> str:
     return (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY") or "").strip()
+
+
+class SpeechError(Exception):
+    """La voix n'a pas pu être préparée. Le message est en français."""
+
+
+def synthesize_speech(text: str, api_key: str) -> bytes:
+    cached = _SPEECH_CACHE.get(text)
+    if cached is not None:
+        return cached
+    payload = {
+        "model": TTS_MODEL,
+        "input": [
+            {
+                "type": "user_input",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": text,
+                        "annotations": [{"type": "speech_metadata", "style": TTS_STYLE}],
+                    }
+                ],
+            }
+        ],
+        "response_format": {"type": "audio"},
+        "generation_config": {"speech_config": [{"voice": TTS_VOICE}]},
+    }
+    request = urllib.request.Request(
+        "https://generativelanguage.googleapis.com/v1beta/interactions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=40) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as exc:
+        raise SpeechError("La voix Google n'a pas répondu. Réessaie.") from exc
+    except urllib.error.URLError as exc:
+        raise SpeechError("La voix Google est injoignable. Réessaie.") from exc
+    audio = _audio_from_payload(json.loads(raw.decode("utf-8")))
+    if len(_SPEECH_CACHE) > 12:
+        _SPEECH_CACHE.clear()
+    _SPEECH_CACHE[text] = audio
+    return audio
+
+
+def _audio_from_payload(payload: dict) -> bytes:
+    encoded = ""
+    direct = payload.get("output_audio")
+    if isinstance(direct, dict):
+        encoded = str(direct.get("data") or "")
+    if not encoded:
+        for step in payload.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            for content in step.get("content") or []:
+                if (
+                    isinstance(content, dict)
+                    and content.get("type") == "audio"
+                    and content.get("data")
+                ):
+                    encoded = str(content["data"])
+    if not encoded:
+        raise SpeechError("La voix Google n'a rien renvoyé. Réessaie.")
+    if encoded.startswith("data:"):
+        encoded = encoded.split(",", 1)[-1]
+    try:
+        return base64.b64decode(encoded)
+    except ValueError as exc:
+        raise SpeechError("La voix Google est illisible. Réessaie.") from exc
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -69,7 +167,11 @@ class Handler(BaseHTTPRequestHandler):
             self._static(path)
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path.split("?", 1)[0] != "/api/analyze":
+        path = self.path.split("?", 1)[0]
+        if path == "/api/speak":
+            self._speak()
+            return
+        if path != "/api/analyze":
             self._error(HTTPStatus.NOT_FOUND, "not_found", "Route inconnue.")
             return
         length = int(self.headers.get("Content-Length") or 0)
@@ -104,11 +206,44 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._json({"verdict": verdict.model_dump(), "demo": False})
 
+    def _speak(self) -> None:
+        length = int(self.headers.get("Content-Length") or 0)
+        if length <= 0 or length > 8000:
+            self._error(HTTPStatus.BAD_REQUEST, "speech", "Phrase trop longue.")
+            return
+        try:
+            payload = json.loads(self.rfile.read(length).decode("utf-8"))
+        except (UnicodeError, json.JSONDecodeError):
+            self._error(HTTPStatus.BAD_REQUEST, "speech", "Phrase illisible.")
+            return
+        text = str(payload.get("text") or "").strip()[:400]
+        if not text:
+            self._error(HTTPStatus.BAD_REQUEST, "speech", "Aucune phrase à lire.")
+            return
+        api_key = (self.headers.get("X-Api-Key") or "").strip() or _server_key()
+        if not api_key:
+            self._error(HTTPStatus.BAD_REQUEST, "no_key", "Aucune clé API Google.")
+            return
+        try:
+            audio = synthesize_speech(text, api_key)
+        except SpeechError as exc:
+            self._error(HTTPStatus.BAD_GATEWAY, "speech", str(exc))
+            return
+        self._bytes(audio, "audio/wav")
+
     # --- réponses ---------------------------------------------------------
     def _json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _bytes(self, body: bytes, content_type: str) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
@@ -155,6 +290,7 @@ def _lan_address() -> str | None:
 
 
 def main() -> None:
+    _load_env()
     port = int(os.environ.get("PORT", "8000"))
     httpd = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     lan = _lan_address()

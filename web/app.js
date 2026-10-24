@@ -10,7 +10,8 @@ const TEXTS = {
   pillCheck: "VÉRIFIE QUAND MÊME",
   listen: "Écouter",
   listenStop: "Arrêter la lecture",
-  listenMissing: "Voix indisponible sur ce téléphone",
+  listenBusy: "Je prépare la voix...",
+  listenMissing: "La voix n'a pas répondu. Réessaie.",
   score: (n) => `Repère pour le jury : ${n} / 100`,
   serverOk: "Serveur SafeMomo joignable",
   serverKey: "Serveur SafeMomo joignable · clé déjà réglée",
@@ -119,12 +120,15 @@ async function onFileChosen(event) {
 
 async function useSample() {
   try {
-    const res = await fetch("samples/fake_tmoney_sample.png", { cache: "force-cache" });
+    const res = await fetch("samples/fake_tmoney_sample.png", { cache: "no-store" });
     if (!res.ok) throw new Error("absent");
     setPhoto(await res.blob());
   } catch {
     showError("network");
+    return;
   }
+  // L'exemple part sur Gemma. Le mode démo ne s'applique qu'au bouton « Dis-moi quoi faire ».
+  await scan({ real: true });
 }
 
 function reset() {
@@ -136,15 +140,16 @@ function reset() {
 // ---------- Analyse ----------
 function demoMode() { return $("team-demo").checked; }
 
-async function scan() {
+async function scan(options) {
   if (!state.blob) { show("empty"); return; }
   show("waiting");
   const controller = new AbortController();
   state.controller = controller;
   const timer = setTimeout(() => controller.abort("timeout"), TIMEOUT_MS);
+  const simulated = !(options && options.real) && demoMode();
 
   try {
-    if (demoMode()) {
+    if (simulated) {
       await wait(DEMO_DELAY_MS, controller.signal);
       renderVerdict(await getDemoVerdict(controller.signal), true);
       return;
@@ -252,14 +257,9 @@ function renderVerdict(v, demo) {
 }
 
 // ---------- Voix ----------
-const synth = "speechSynthesis" in window ? window.speechSynthesis : null;
-let frenchVoice = null;
-function pickVoice() {
-  if (!synth) return;
-  const voices = synth.getVoices();
-  frenchVoice = voices.find((v) => v.lang === "fr-FR") || voices.find((v) => v.lang && v.lang.startsWith("fr")) || null;
-}
-if (synth) { pickVoice(); synth.addEventListener?.("voiceschanged", pickVoice); }
+// Charon, via Gemini, servi par /api/speak. Pas la voix mince du navigateur.
+let player = null;
+let speakController = null;
 
 function setListening(on) {
   $("btn-listen").setAttribute("aria-pressed", on ? "true" : "false");
@@ -267,21 +267,55 @@ function setListening(on) {
 }
 
 function stopSpeaking() {
-  if (synth) synth.cancel();
+  if (speakController) speakController.abort();
+  speakController = null;
+  if (player) {
+    player.pause();
+    player = null;
+  }
   setListening(false);
 }
 
-function speak() {
-  if (!synth || !state.verdict) return;
-  if ($("btn-listen").getAttribute("aria-pressed") === "true") { stopSpeaking(); return; }
-  synth.cancel();
-  const utterance = new SpeechSynthesisUtterance(state.verdict.spoken_sentence);
-  utterance.lang = "fr-FR";
-  if (frenchVoice) utterance.voice = frenchVoice;
-  utterance.rate = 0.92;
-  utterance.onend = utterance.onerror = () => setListening(false);
+async function speak() {
+  if (!state.verdict) return;
+  if ($("btn-listen").getAttribute("aria-pressed") === "true") {
+    stopSpeaking();
+    return;
+  }
+  const controller = new AbortController();
+  speakController = controller;
   setListening(true);
-  synth.speak(utterance);
+  $("listen-text").textContent = TEXTS.listenBusy;
+  try {
+    const headers = { "Content-Type": "application/json" };
+    const key = $("team-key").value.trim();
+    if (key) headers["X-Api-Key"] = key;
+    const res = await fetch("api/speak", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ text: state.verdict.spoken_sentence }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error("speech");
+    const blob = await res.blob();
+    if (controller.signal.aborted) return;
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    player = audio;
+    audio.onended = () => {
+      URL.revokeObjectURL(url);
+      if (player === audio) player = null;
+      setListening(false);
+    };
+    setListening(true);
+    await audio.play();
+  } catch (err) {
+    if (controller.signal.aborted) return;
+    stopSpeaking();
+    $("listen-text").textContent = TEXTS.listenMissing;
+  } finally {
+    if (speakController === controller) speakController = null;
+  }
 }
 
 // ---------- Erreurs ----------
@@ -361,11 +395,6 @@ function init() {
   $("btn-error-action").addEventListener("click", onErrorAction);
   $("open-team").addEventListener("click", openTeam);
   document.querySelectorAll("[data-action='reset']").forEach((b) => b.addEventListener("click", reset));
-
-  if (!synth) {
-    $("btn-listen").disabled = true;
-    $("listen-text").textContent = TEXTS.listenMissing;
-  }
 
   initTeam();
   loadConfig();
