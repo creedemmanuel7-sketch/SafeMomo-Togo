@@ -7,15 +7,14 @@
 [![Agent Skill Standard](https://img.shields.io/badge/Standard-SKILL.md-green.svg)](./SKILL.md)
 
 ## 🚨 The Problem in Togo
-Every single day in Lomé, citizens, students, and small shopkeepers lose their hard-earned savings to sophisticated **fake T-Money & Flooz SMS transfers** and WhatsApp social engineering traps (*"Pardon maman, I sent the hospital money to your number by mistake, send it back immediately!"*). 
-
-Traditional regex filters fail because modern scammers use screenshots of manipulated receipts and psychological urgency.
+In Lomé, people hand over goods or send money back because a **picture** looks like a T-Money or Flooz receipt. The operator name is drawn inside the image. The official channel never sent anything. A regex on the SMS inbox cannot see that photo, and the person in front of the counter has about ten seconds.
 
 ## 💡 The Solution: SafeMomo Togo
-SafeMomo is an open-source AI guardian. Whenever a user suspects a message:
-1. They take a **screenshot** of the SMS or WhatsApp message.
-2. **Gemma 4 Multimodal** inspects the visual header, checks sender legitimacy (personal number vs. official gateway), audits the transaction structure, and analyzes social manipulation signals.
-3. The app delivers a **high-confidence scam score**, a plain-language explanation in local context, and generates an **instant WhatsApp broadcast alert** to protect family and community members.
+SafeMomo is an open-source witness for that moment. Someone photographs the screen they were just shown.
+1. **Gemma 4** looks at the image: WhatsApp chrome, a pasted receipt, a personal number, a push to act now.
+2. The screen answers with **one spoken sentence** and a full-color card. No score in front of the user.
+3. One button reads the sentence aloud. Another opens WhatsApp with a warning the family can forward.
+4. "Voir pourquoi" keeps the visual reasoning for the jury. The sidebar (API key, model, offline demo) stays collapsed.
 
 ## ✨ Key Features
 - 📸 **Visual & Multimodal Fraud Audit:** Analyzes phone screenshots without manual typing.
@@ -28,18 +27,23 @@ SafeMomo is an open-source AI guardian. Whenever a user suspects a message:
 ```text
 SafeMomo-Togo/
 ├── SKILL.md              # Open Standard Agent Skill declaration
-├── app.py                # Core Streamlit application + Gemma 4 vision
+├── app.py                # Photo, session, Gemma call
+├── ui.py                 # Screen owned by the UX lead
+├── UX.md                 # UI handoff: states, copy, colors
+├── analyzer.py           # Gemma 4 vision call + JSON verdict parsing
 ├── requirements.txt      # Python dependencies
 ├── LICENSE               # Open-source MIT license
 ├── README.md             # Project documentation
-└── HANDOVER_CURSOR.md    # Cursor IDE configuration & handover guide
+├── HANDOVER_CURSOR.md    # Cursor IDE configuration & handover guide
+├── samples/              # Synthetic scam screenshot for the demo
+└── tests/                # Parser and image-prep checks
 ```
 
 ## 🚀 Quickstart
 
 ```bash
 # Clone the repository
-git clone https://github.com/votre-user/SafeMomo-Togo.git
+git clone https://github.com/creedemmanuel7-sketch/SafeMomo-Togo.git
 cd SafeMomo-Togo
 
 # Install dependencies

@@ -12,7 +12,7 @@
 
 ## 2. Objectif du Projet
 Construire **SafeMomo Togo**, une application web interactive Python (Streamlit) propulsée par le modèle multimodal **Gemma 4**.
-L'application permet à tout citoyen togolais de charger une capture d'écran d'un SMS ou message WhatsApp suspect pour détecter instantanément s'il s'agit d'une arnaque Mobile Money (**T-Money / Flooz**) ou d'ingénierie sociale (faux transferts, faux recrutements).
+L'application regarde la **photo** d'un reçu ou d'un message WhatsApp et répond par **une phrase dite à voix haute**, avant qu'une marchandise parte ou qu'un argent soit renvoyé. Le lead UI travaille dans `ui.py` et `UX.md`. Gemma reste dans `analyzer.py`.
 
 ---
 
