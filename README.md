@@ -31,6 +31,8 @@ SafeMomo-Togo/
 ├── ui.py                 # Screen owned by the UX lead
 ├── UX.md                 # UI handoff: states, copy, colors
 ├── analyzer.py           # Gemma 4 vision call + JSON verdict parsing
+├── server.py             # Thin bridge: phone app → analyzer.py (stdlib only)
+├── web/                  # Installable mobile web app (camera, card, voice, WhatsApp)
 ├── requirements.txt      # Python dependencies
 ├── LICENSE               # Open-source MIT license
 ├── README.md             # Project documentation
@@ -53,6 +55,28 @@ pip install -r requirements.txt
 export GEMINI_API_KEY="your-api-key"
 streamlit run app.py
 ```
+
+## 📱 Application mobile (web app installable)
+
+L'écran pour la vendeuse et la famille : une photo, une carte pleine largeur, une phrase, Écouter, Prévenir la famille. Gemma 4 reste dans `analyzer.py` ; `server.py` ne fait que lui passer l'image.
+
+```bash
+pip install -r requirements.txt          # aucune dépendance en plus
+export GEMINI_API_KEY="your-api-key"     # optionnel : sinon menu Équipe ou mode démo
+python server.py
+```
+
+Le terminal affiche deux adresses :
+- `http://localhost:8000` sur l'ordinateur ;
+- `http://<ip-du-pc>:8000` à ouvrir sur le téléphone, **connecté au même Wi-Fi**.
+
+Sur le téléphone : menu du navigateur › « Ajouter à l'écran d'accueil ». L'icône SafeMomo apparaît comme une app.
+
+**Démo sans internet** : bouton réglages en haut à droite (menu Équipe) › cocher « Mode démo sans internet » › Voir l'exemple › Dis-moi quoi faire. Phrase attendue : « Ne renvoie rien. Ce message n'est pas un vrai T-Money. Tape *145#. »
+
+Routes du pont : `POST /api/analyze` (corps = l'image brute, en-têtes optionnels `X-Api-Key`, `X-Model`) → `{"verdict": {...}}` ; `GET /api/demo` → `demo_verdict()` ; `GET /api/config` → modèles Gemma 4 disponibles. Les erreurs reviennent en `{"error": {"kind", "detail"}}` et l'app les traduit en une phrase française avec une action.
+
+Le prototype Streamlit (`streamlit run app.py`) reste disponible pour l'équipe.
 
 ## 👥 The Team
 Proudly built by **Team SafeMomo** for Hacktoberfest Hack Day Lomé 2026:
