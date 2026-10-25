@@ -37,7 +37,7 @@ Quatre faits, lisibles sans ouvrir le code.
 13. [Ressources](#ressources)
 14. [Attribution IA](#attribution-ia)
 15. [Licence](#licence)
-16. [Ancien écran Streamlit](#ancien-écran-streamlit)
+16. [Interface de la démo](#interface-de-la-démo)
 
 ## Le problème
 
@@ -339,11 +339,9 @@ Comme le demande le Hacktoberfest Hack Day, des assistants de code ont servi à 
 
 On peut utiliser, modifier et redistribuer ce projet. L'avis de licence doit rester avec les copies. Le logiciel est fourni sans garantie. SafeMomo aide à regarder une image. Il ne remplace pas `*145#`, ni un avis juridique.
 
-## Ancien écran Streamlit
+## Interface de la démo
 
-`app.py` et `ui.py` sont l'ancien écran Streamlit de l'équipe. Ils ne servent pas à la démo. Un juré ne les lance pas.
-
-La démo se fait uniquement avec :
+La démo est une interface web en HTML, CSS et JavaScript, dans `web/`. Elle est servie uniquement par :
 
 ```bash
 python server.py
@@ -351,4 +349,4 @@ python server.py
 
 Port 8000, page `http://localhost:8000`. **Écouter** utilise la voix Charon. WebSpeech n'est plus dans ce parcours.
 
-`streamlit run app.py` ouvre seulement cet ancien écran, en général sur le port 8501. Là, **Écouter** parle encore avec la voix du navigateur.
+`app.py` et `ui.py` sont l'ancien écran Streamlit de l'équipe. Ils ne servent pas à la démo. Un juré ne les lance pas. `streamlit run app.py` ouvre seulement cet ancien écran, en général sur le port 8501, où **Écouter** parle encore avec la voix du navigateur.
