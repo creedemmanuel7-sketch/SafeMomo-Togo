@@ -11,8 +11,8 @@
 ---
 
 ## 2. Objectif du Projet
-Construire **SafeMomo Togo**, une application web interactive Python (Streamlit) propulsée par le modèle multimodal **Gemma 4**.
-L'application regarde la **photo** d'un reçu ou d'un message WhatsApp et répond par **une phrase dite à voix haute**, avant qu'une marchandise parte ou qu'un argent soit renvoyé. Le lead UI travaille dans `ui.py` et `UX.md`. Gemma reste dans `analyzer.py`.
+Construire **SafeMomo Togo**, une application web (HTML, CSS, JavaScript) servie par `server.py`, propulsée par le modèle multimodal **Gemma 4**.
+L'application regarde la **photo** d'un reçu ou d'un message WhatsApp et répond par **une phrase dite à voix haute** (voix Charon), avant qu'une marchandise parte ou qu'un argent soit renvoyé. L'écran à ouvrir est `web/`. `ui.py` reste l'écran d'équipe, pas la démo. Gemma reste dans `analyzer.py`.
 
 ---
 
@@ -23,7 +23,7 @@ Dans le terminal de Cursor :
 # 1. Installation des dépendances
 pip install -r requirements.txt
 
-# 2. Lancement immédiat de l'application
-streamlit run app.py
+# 2. Lancement immédiat de l'application (port 8000)
+python server.py
 ```
-*(Si la clé API GEMINI_API_KEY n'est pas définie, vous pouvez la renseigner directement dans la barre latérale de l'application ou cocher le "Mode Démo de Secours" pour les tests sans connexion).*
+Ouvrir `http://localhost:8000`. *(Si la clé API GEMINI_API_KEY n'est pas dans `.env`, la renseigner dans le menu Équipe, ou cocher le mode démo sans internet.)*

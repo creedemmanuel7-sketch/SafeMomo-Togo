@@ -20,7 +20,7 @@ GEMINI_API_KEY=ta_cle_ici
 python server.py
 ```
 
-Écran : `http://localhost:8000`. L'écran Streamlit de l'équipe : `streamlit run app.py`.
+Écran : `http://localhost:8000`.
 
 ## Tester
 
@@ -42,3 +42,7 @@ Ces tests ne consomment pas de clé. Un changement du parseur ou de la taille d'
 - `.env`, une clé, un jeton.
 - Une capture de SMS réel, un numéro réel, un nom de client.
 - Une phrase qui autorise à envoyer de l'argent sans `*145#`.
+
+## Écran d'équipe
+
+`streamlit run app.py` ouvre l'ancien écran, en général sur le port 8501. Ce n'est pas le parcours à montrer : **Écouter** y utilise encore la voix du navigateur. L'écran de la démo reste `python server.py`, port 8000.

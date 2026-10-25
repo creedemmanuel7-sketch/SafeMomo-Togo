@@ -37,6 +37,7 @@ Quatre faits, lisibles sans ouvrir le code.
 13. [Ressources](#ressources)
 14. [Attribution IA](#attribution-ia)
 15. [Licence](#licence)
+16. [Écran d'équipe](#écran-déquipe)
 
 ## Le problème
 
@@ -95,7 +96,7 @@ cd SafeMomo-Togo
 pip install -r requirements.txt
 ```
 
-Dépendances : Streamlit, `google-genai`, Pillow, Pydantic. L'écran web n'ajoute aucun paquet. `server.py` et `app.py` lisent `.env` sans bibliothèque en plus.
+Dépendances : `google-genai`, Pillow, Pydantic. Streamlit n'est utile que pour l'écran d'équipe, tout en bas. L'écran web n'ajoute aucun paquet. `server.py` et `app.py` lisent `.env` sans bibliothèque en plus.
 
 Créer ou éditer `.env` à la racine. Ce fichier est ignoré par git.
 
@@ -112,14 +113,6 @@ python server.py
 ```
 
 `http://localhost:8000` sur cet ordinateur. L'adresse pour le téléphone s'affiche dans le terminal.
-
-L'écran Streamlit reste disponible pour l'équipe :
-
-```bash
-streamlit run app.py
-```
-
-Il écoute en général sur `http://127.0.0.1:8501`.
 
 ## Application web
 
@@ -345,3 +338,13 @@ Comme le demande le Hacktoberfest Hack Day, des assistants de code ont servi à 
 [MIT](./LICENSE). Copyright (c) 2026 Python Togo Community Hackers.
 
 On peut utiliser, modifier et redistribuer ce projet. L'avis de licence doit rester avec les copies. Le logiciel est fourni sans garantie. SafeMomo aide à regarder une image. Il ne remplace pas `*145#`, ni un avis juridique.
+
+## Écran d'équipe
+
+`app.py` et `ui.py` restent dans le dépôt. Ce n'est pas l'écran de la démo, et **Écouter** y utilise encore la voix du navigateur.
+
+```bash
+streamlit run app.py
+```
+
+Il écoute en général sur `http://127.0.0.1:8501`. La démo à montrer reste `python server.py`, port 8000.
