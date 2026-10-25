@@ -2,7 +2,7 @@
    Les réponses /api/ ne sont jamais mises en cache : un verdict est toujours frais. */
 "use strict";
 
-const CACHE = "safemomo-v1";
+const CACHE = "safemomo-v2";
 const SHELL = [
   "./",
   "index.html",

@@ -375,6 +375,27 @@ async function loadConfig() {
   }
 }
 
+function applyTheme(theme) {
+  const dark = theme === "dark";
+  if (dark) document.documentElement.setAttribute("data-theme", "dark");
+  else document.documentElement.removeAttribute("data-theme");
+  const button = $("theme-toggle");
+  if (!button) return;
+  button.setAttribute("aria-pressed", dark ? "true" : "false");
+  button.setAttribute("aria-label", dark ? "Activer le mode clair" : "Activer le mode sombre");
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", dark ? "#121A18" : "#FFFFFF");
+}
+
+function initTheme() {
+  applyTheme(store.get("theme", "light"));
+  $("theme-toggle").addEventListener("click", () => {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    store.set("theme", next);
+    applyTheme(next);
+  });
+}
+
 function initTeam() {
   $("team-key").value = store.get("apiKey");
   $("team-demo").checked = store.get("demo") === "1";
@@ -396,6 +417,7 @@ function init() {
   $("open-team").addEventListener("click", openTeam);
   document.querySelectorAll("[data-action='reset']").forEach((b) => b.addEventListener("click", reset));
 
+  initTheme();
   initTeam();
   loadConfig();
 
