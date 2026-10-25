@@ -1,10 +1,11 @@
-"""Appels Gemma 4 et parsing JSON du verdict SafeMomo."""
+"""Appels Gemma 4, lecture de l'écran, puis règles Python du verdict."""
 
 from __future__ import annotations
 
 import io
 import json
 import re
+import unicodedata
 
 from PIL import Image
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
@@ -25,46 +26,32 @@ GEMMA_MODELS = {
 
 _MAX_EDGE = 1280
 _JSON_KEYS = (
-    "is_scam",
-    "risk_score",
-    "scene",
-    "verdict_title",
-    "spoken_sentence",
-    "sender_analysis",
-    "red_flags",
-    "plain_advice",
-    "whatsapp_alert",
+    "sender_label",
+    "message_text",
+    "reply_blocked",
+    "in_whatsapp",
+    "asks_to_send_back",
 )
 _FALLBACK_SPOKEN = "Ne donne rien. Vérifie ton solde avec *145#."
 
 SYSTEM_PROMPT = """
-Tu es SafeMomo, à Lomé. On te montre la photo d'un écran : un reçu T-Money
-ou Flooz, ou un message WhatsApp. La personne doit décider en dix secondes
-si elle donne une marchandise ou si elle renvoie de l'argent.
-
-Tu juges l'image, pas seulement le texte :
-- Un vrai avis vient du canal TMONEY ou MOOV_MONEY. Un numéro personnel
-  (+228) qui annonce un transfert est une arnaque.
-- Une capture collée dans WhatsApp, une mention transféré, un montant
-  recollé, une référence invraisemblable ou un solde absent : la preuve
-  est une image, le compte n'a rien reçu.
-- L'urgence (« erreur de transfert », hôpital, « renvoie vite ») pousse
-  à agir avant de vérifier.
-
-Choisis scene :
-- boutique : quelqu'un montre un reçu pour emporter une marchandise.
-- famille : quelqu'un demande de renvoyer de l'argent.
-- autre : le reste.
-
-spoken_sentence : UNE phrase de français simple, dite à voix haute.
-Elle dit quoi faire. Elle ne dit jamais d'envoyer de l'argent.
-Si tu doutes : dire de taper *145# avant toute action.
+Tu lis une photo d'écran pour SafeMomo, à Lomé. Tu ne décides pas si c'est
+une arnaque. Tu recopies seulement ce qui est visible.
 
 Réponds uniquement avec un objet JSON, sans markdown, avec exactement ces clés :
-is_scam (booléen), risk_score (entier 0-100), scene (boutique, famille ou autre),
-verdict_title (texte court), spoken_sentence (une phrase),
-sender_analysis (texte), red_flags (liste de textes), plain_advice (texte),
-whatsapp_alert (texte prêt à partager).
+- sender_label : le nom ou le numéro en haut du fil, tel qu'écrit.
+  Exemples : MoovMoney, Movemoney, Mixx by Yas, Miss by Yas, Flooz, +228 90 12 34 56.
+  Vide si aucun en-tête n'est visible.
+- message_text : le texte des bulles, lignes conservées. Inclus montant,
+  heure, référence, Txn ID, solde. N'invente aucun chiffre.
+- reply_blocked : true si l'écran dit qu'on ne peut pas répondre
+  (« ne peut pas accepter de réponses », « réponse non disponible »).
+- in_whatsapp : true seulement si l'image est une discussion WhatsApp
+  ou un message transféré, pas l'application SMS du téléphone.
+- asks_to_send_back : true si le texte demande de renvoyer, rembourser
+  ou redonner l'argent.
+
+Ne mets pas is_scam. Ne juge pas l'expéditeur.
 """.strip()
 
 USER_PROMPT = (
@@ -158,6 +145,187 @@ class ScamVerdict(BaseModel):
         return text
 
 
+class ScreenReading(BaseModel):
+    """Ce que Gemma a lu. Le verdict n'est pas dans cet objet."""
+
+    sender_label: str = ""
+    message_text: str = ""
+    reply_blocked: bool = False
+    in_whatsapp: bool = False
+    asks_to_send_back: bool = False
+
+    @field_validator("sender_label", "message_text", mode="before")
+    @classmethod
+    def coerce_optional_text(cls, value: object) -> str:
+        return "" if value is None else str(value).strip()
+
+    @field_validator("reply_blocked", "in_whatsapp", "asks_to_send_back", mode="before")
+    @classmethod
+    def coerce_flag(cls, value: object) -> bool:
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "vrai", "oui", "yes"}
+        return bool(value)
+
+
+_OPERATOR_NAMES = (
+    "movemoney",
+    "moovmoney",
+    "flooz",
+    "mixxbyyas",
+    "mixx",
+    "missbyyas",
+    "tmoney",
+    "yas",
+)
+_MOOV_MARKS = ("movemoney", "moovmoney", "moov", "flooz")
+_AMOUNT = re.compile(
+    r"\d[\d\s.,]*\s*(?:fcfa|f\b|francs?)",
+    re.IGNORECASE,
+)
+_REFERENCE = re.compile(
+    r"(txn\s*id|r[ée]f[ée]rence|reference|\bref\b|id\s+de\s+transaction)",
+    re.IGNORECASE,
+)
+_NOTICE = re.compile(
+    r"(transfert|solde|alerte|re[çc]u|recu|montant|txn)",
+    re.IGNORECASE,
+)
+
+
+def _fold(text: str) -> str:
+    stripped = unicodedata.normalize("NFKD", text)
+    stripped = "".join(char for char in stripped if not unicodedata.combining(char))
+    return re.sub(r"[^a-z0-9+]", "", stripped.lower())
+
+
+def _is_phone(label: str) -> bool:
+    compact = re.sub(r"[\s.\-()]", "", label.strip())
+    digits = re.sub(r"\D", "", compact)
+    if compact.startswith("+") and len(digits) >= 8:
+        return True
+    if digits.startswith("228") and 11 <= len(digits) <= 13 and _fold(label).startswith("228"):
+        return True
+    return bool(re.fullmatch(r"\d{8}", compact))
+
+
+def _is_operator_name(label: str) -> bool:
+    if _is_phone(label):
+        return False
+    folded = _fold(label)
+    return any(name in folded for name in _OPERATOR_NAMES)
+
+
+def _looks_like_operator_notice(text: str) -> bool:
+    if not _NOTICE.search(text):
+        return False
+    return bool(_AMOUNT.search(text) or _REFERENCE.search(text))
+
+
+def _balance_code(sender: str, body: str) -> str:
+    folded = _fold(sender + " " + body)
+    if any(mark in folded for mark in _MOOV_MARKS):
+        return "*155#"
+    return "*145#"
+
+
+def decide(reading: ScreenReading) -> ScamVerdict:
+    """Applique les règles. Gemma ne fournit pas is_scam."""
+
+    sender = reading.sender_label.strip()
+    body = reading.message_text.strip()
+    operator = _is_operator_name(sender)
+    phone = _is_phone(sender)
+    notice = _looks_like_operator_notice(body)
+    code = _balance_code(sender, body)
+
+    if reading.asks_to_send_back or (phone and notice) or (reading.in_whatsapp and notice):
+        return ScamVerdict.model_validate(
+            {
+                "is_scam": True,
+                "risk_score": 96,
+                "scene": "famille" if reading.asks_to_send_back else "boutique",
+                "verdict_title": "Avis imité depuis un numéro",
+                "spoken_sentence": (
+                    f"Ne renvoie rien. Cet avis ne vient pas de l'opérateur. Tape {code}."
+                ),
+                "sender_analysis": (
+                    f"L'en-tête affiche « {sender or 'aucun nom'} ». "
+                    "Un vrai avis MoovMoney, Flooz ou Mixx by Yas porte le nom "
+                    "de l'opérateur, pas un numéro, et ne demande pas de renvoyer l'argent."
+                ),
+                "red_flags": _scam_flags(reading, phone, notice),
+                "plain_advice": f"Ne donne rien. Tape {code} avant toute action.",
+                "whatsapp_alert": (
+                    "ALERTE : un message imite un avis de transfert Mobile Money. "
+                    f"Ne renvoyez rien avant d'avoir tapé {code}."
+                ),
+            }
+        )
+
+    if operator and notice:
+        shown = sender or "l'opérateur"
+        return ScamVerdict.model_validate(
+            {
+                "is_scam": False,
+                "risk_score": 20,
+                "scene": "autre",
+                "verdict_title": "Avis opérateur",
+                "spoken_sentence": (
+                    f"C'est un avis {shown}. Vérifie quand même le solde avec {code}."
+                ),
+                "sender_analysis": (
+                    f"L'en-tête « {shown} » est un nom d'opérateur, pas un numéro. "
+                    "Le texte a la forme d'un avis de transfert, de solde ou d'alerte."
+                ),
+                "red_flags": [],
+                "plain_advice": (
+                    f"Cet écran ressemble à un avis opérateur. Tape {code} "
+                    "avant de donner une marchandise ou de l'argent."
+                ),
+                "whatsapp_alert": (
+                    f"Un avis {shown} est affiché. "
+                    f"Vérifiez le solde avec {code} avant d'agir."
+                ),
+            }
+        )
+
+    return ScamVerdict.model_validate(
+        {
+            "is_scam": False,
+            "risk_score": 10,
+            "scene": "autre",
+            "verdict_title": "Pas un avis Mobile Money",
+            "spoken_sentence": (
+                "Ce n'est pas un avis Mobile Money. "
+                "Ne te base pas dessus pour envoyer de l'argent."
+            ),
+            "sender_analysis": (
+                f"L'en-tête « {sender or 'absent'} » n'est pas un canal opérateur "
+                "annonçant un transfert."
+            ),
+            "red_flags": [],
+            "plain_advice": "Rien à vérifier sur un compte Mobile Money dans cette image.",
+            "whatsapp_alert": (
+                "Le message montré n'est pas un avis Mobile Money. "
+                "N'envoyez rien sur cette base."
+            ),
+        }
+    )
+
+
+def _scam_flags(reading: ScreenReading, phone: bool, notice: bool) -> list[str]:
+    flags: list[str] = []
+    if phone and notice:
+        flags.append("Un numéro personnel annonce un transfert au format opérateur")
+    if reading.asks_to_send_back:
+        flags.append("Le texte demande de renvoyer l'argent")
+    if reading.in_whatsapp and notice:
+        flags.append("L'avis est montré dans WhatsApp, pas dans les SMS de l'opérateur")
+    if not reading.reply_blocked and phone:
+        flags.append("On peut répondre, comme à une personne")
+    return flags or ["Le message imite un avis opérateur"]
+
+
 def demo_verdict() -> ScamVerdict:
     """Verdict local quand le réseau ou la clé API manque."""
     return ScamVerdict.model_validate(
@@ -201,14 +369,20 @@ def image_to_jpeg(image: Image.Image) -> bytes:
     return buffer.getvalue()
 
 
-def parse_verdict(raw: str) -> ScamVerdict:
+def parse_reading(raw: str) -> ScreenReading:
     payload = _extract_json(raw)
     try:
-        return ScamVerdict.model_validate(payload)
+        return ScreenReading.model_validate(payload)
     except ValidationError as exc:
         raise AnalysisError(
-            "Gemma 4 a répondu, mais le verdict ne respecte pas le format attendu."
+            "Gemma 4 a répondu, mais la lecture de l'écran est incomplète."
         ) from exc
+
+
+def parse_verdict(raw: str) -> ScamVerdict:
+    """Compatibilité : une lecture JSON devient un verdict par les règles."""
+
+    return decide(parse_reading(raw))
 
 
 def analyze_screenshot(
@@ -239,10 +413,10 @@ def analyze_screenshot(
     )
     raw = _generate_raw(client, model, [image_part, USER_PROMPT])
     try:
-        return parse_verdict(raw)
+        reading = parse_reading(raw)
     except AnalysisError:
-        repaired = _repair_json(client, model, raw)
-        return parse_verdict(repaired)
+        reading = parse_reading(_repair_json(client, model, raw))
+    return decide(reading)
 
 
 def _generate_raw(client: object, model: str, contents: list[object]) -> str:
@@ -252,7 +426,11 @@ def _generate_raw(client: object, model: str, contents: list[object]) -> str:
         temperature=0.2,
         max_output_tokens=1024,
         response_mime_type="application/json",
-        media_resolution=types.MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+        media_resolution=getattr(
+            types.MediaResolution,
+            "MEDIA_RESOLUTION_HIGH",
+            types.MediaResolution.MEDIA_RESOLUTION_MEDIUM,
+        ),
         thinking_config=types.ThinkingConfig(
             thinking_level=types.ThinkingLevel.MINIMAL,
             include_thoughts=False,
